@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const bodyparser = require("body-parser");
 const axios = require('axios');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 //middleware
@@ -32,13 +34,13 @@ router.get("/fetch-news", async (req,res)=>{
 
         const response = await axios.get(url);
         const newsData = response.data.results;
-        // console.log("api testing at backend", )
+
         newsData.forEach(async (news)=>{
             const newsItem = new NewsModel({
                 title : news.title,
                 content : news.content,
                 description : news.description, 
-                // keywords : [String],
+                category : news.category,
                 image_url : news.image_url,
                 link : news.link,       
             });
@@ -129,6 +131,56 @@ router.put("/news/:id", async (req, res) => {
     }
 });
 
+//authentication :: signUp
+const User = require('./models/User');
+const secret_key = "2ub3h2vygcsc8s83njbjs";
+
+router.post("/signup", async (req, res)=>{
+    try{
+        const {email, password} = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({ email, password: hashedPassword });
+        await user.save();
+    }
+    catch(error){
+        // console.log("error while signup", error);
+        res.status(500).json({error : "An error has caused during the signup"})
+    }
+})
+//authentication :: SingIn
+router.post("/signin", async(req, res)=>{
+    try{
+        const {email, password} = req.body;
+        if(!email || !password){
+            return res.status(400).json({error : "Username and password are required."});
+        }
+
+        const user = await  User.findOne({email});
+        // console.log('user with email found', user);
+
+        if (!user) {
+            // console.error("User not found for username:", email);
+            return res.status(401).json({ error: "user not found" });
+        }
+
+        const passMatch = await bcrypt.compare(password, user.password);
+        if(!passMatch){
+            return res.status(401).json({error: "please login with correct password"})
+        }
+        
+        const token = jwt.sign({ email }, secret_key, { expiresIn: "1h" });
+        res.status(200).json({ token })
+    }
+    catch(error){
+        // console.error("Error during login:", error);
+        res.status(500).json({ error: "an error has occurred" })
+    }
+})
+
+//
+router.get("/", (req,res)=>{
+    res.json({endpoint : "https://neoma-ai-backend.vercel.app/api/news"})
+})
 //server start
 app.use("/api",router);
 const port = process.env.PORT || 3000;

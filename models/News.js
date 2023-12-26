@@ -6,6 +6,7 @@ const NewsSchema = new mongoose.Schema({
     description : String,
     image_url : String,
     link : String,
+    category : [String],
 });
 
 const NewsModel = mongoose.model("News",NewsSchema);
